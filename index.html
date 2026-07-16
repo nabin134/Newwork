@@ -291,6 +291,18 @@
 
   <div id="screenshotToast" class="screenshot-toast" hidden></div>
 
+  <div id="logoutConfirmModal" class="logout-confirm-modal hidden" aria-hidden="true" role="dialog" aria-labelledby="logoutConfirmTitle">
+    <div class="logout-confirm-backdrop" id="logoutConfirmBackdrop"></div>
+    <div class="logout-confirm-dialog">
+      <h3 id="logoutConfirmTitle" class="logout-confirm-title">Logout</h3>
+      <p class="logout-confirm-message">Are you sure you want to logout?</p>
+      <div class="logout-confirm-actions">
+        <button type="button" id="logoutConfirmCancel" class="logout-confirm-btn logout-confirm-cancel">Cancel</button>
+        <button type="button" id="logoutConfirmOk" class="logout-confirm-btn logout-confirm-ok">Yes, Logout</button>
+      </div>
+    </div>
+  </div>
+
   <div id="systemHintModal" class="system-hint-modal hidden" aria-hidden="true">
     <div class="system-hint-backdrop" id="systemHintBackdrop"></div>
     <div id="systemHintDialog" class="system-hint-dialog">

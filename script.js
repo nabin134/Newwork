@@ -175,7 +175,7 @@ function closeActiveHintModal() {
 }
 
 function getCaptureHomeScene(type) {
-  if (type === "reputation") {
+  if (type === "reputation" || type === "member") {
     return {
       tab: "member",
       view: "dashboard",
@@ -196,7 +196,7 @@ function getCaptureHomeScene(type) {
       activeChipIndex: 3,
     };
   }
-  if (type === "notice") {
+  if (type === "notice" || type === "order") {
     return {
       tab: "order",
       view: "dashboard",
@@ -213,6 +213,48 @@ function getCaptureHomeScene(type) {
         "Order Config",
         "Check Order",
         "Export Order",
+      ],
+      activeChipIndex: 3,
+    };
+  }
+  if (type === "info") {
+    return {
+      tab: "info",
+      view: "dashboard",
+      title: "Info Report",
+      tableTitle: "Recent Info Report Records",
+      chipLabels: [
+        "Daily Report",
+        "Weekly Report",
+        "Monthly Report",
+        "Info Center",
+        "User Report",
+        "Risk Report",
+        "Finance Report",
+        "Export Report",
+        "Audit Log",
+        "Summary",
+      ],
+      activeChipIndex: 3,
+    };
+  }
+  if (type === "function") {
+    return {
+      tab: "function",
+      view: "dashboard",
+      title: "User Function",
+      tableTitle: "Recent User Function Records",
+      chipLabels: [
+        "User List",
+        "Role Manage",
+        "Permission",
+        "User Function",
+        "Access Log",
+        "Device Bind",
+        "Security",
+        "Config",
+        "Audit",
+        "Tools",
       ],
       activeChipIndex: 3,
     };
@@ -393,14 +435,15 @@ async function captureDashboardScreenshot(triggerEl = null) {
   } finally {
     cleanupCaptureSurface(dialog);
     document.body.classList.remove("is-capture-home");
-    if (dashboard) {
-      dashboard.classList.remove(
-        "capture-theme-large",
-        "capture-theme-reputation",
-        "capture-theme-notice"
-      );
+    if (activeHintModal) {
+      applyHomeScene(getCaptureHomeScene(activeHintModal));
+      applyDashboardTheme(activeHintModal);
+      setModalHomeVisible(true);
+    } else {
+      applyHomeScene(previousScene);
+      clearDashboardTheme();
+      setModalHomeVisible(false);
     }
-    applyHomeScene(previousScene);
     trigger.classList.remove("is-busy");
     trigger.setAttribute("aria-busy", "false");
     trigger.setAttribute("title", previousTitle);
@@ -429,12 +472,42 @@ function printNoticeDocument() {
   window.setTimeout(() => window.print(), 80);
 }
 
+function applyDashboardTheme(type) {
+  const dashboard = document.getElementById("dashboardScreen");
+  if (!dashboard) return;
+  dashboard.classList.remove(
+    "capture-theme-large",
+    "capture-theme-reputation",
+    "capture-theme-notice"
+  );
+  const theme = getHintConfig(type).captureTheme || type || "large";
+  dashboard.classList.add(`capture-theme-${theme}`);
+}
+
+function clearDashboardTheme() {
+  document.getElementById("dashboardScreen")?.classList.remove(
+    "capture-theme-large",
+    "capture-theme-reputation",
+    "capture-theme-notice"
+  );
+}
+
+function setModalHomeVisible(show) {
+  document.body.classList.toggle("modal-home-visible", !!show);
+}
+
 function openSystemHintModal(type = "large") {
   const config = getHintConfig(type);
   const modal = document.getElementById(config.modalId);
   if (!modal) return;
 
   closeAllHintModals(false);
+
+  // Each action opens a different background page on the home dashboard
+  applyHomeScene(getCaptureHomeScene(type));
+  applyDashboardTheme(type);
+  setModalHomeVisible(true);
+
   modal.classList.remove("hidden");
   modal.setAttribute("aria-hidden", "false");
   activeHintModal = type;
@@ -458,7 +531,11 @@ function closeHintModal(type) {
   saveHintContent(type);
 
   if (activeHintModal === type) activeHintModal = null;
-  if (!activeHintModal) toggleModalScreenshotBar(false, null);
+  if (!activeHintModal) {
+    toggleModalScreenshotBar(false, null);
+    setModalHomeVisible(false);
+    clearDashboardTheme();
+  }
 }
 
 function closeAllHintModals(save = true) {
@@ -472,6 +549,8 @@ function closeAllHintModals(save = true) {
   });
   activeHintModal = null;
   toggleModalScreenshotBar(false, null);
+  setModalHomeVisible(false);
+  clearDashboardTheme();
 }
 
 function saveHintContent(type) {
@@ -566,10 +645,26 @@ function switchMainView(view = "dashboard") {
 function initSidebarNavigation() {
   document.getElementById("sidebarHomeBtn")?.addEventListener("click", () => {
     switchMainView("dashboard");
+    applyHomeScene(getCaptureHomeScene("payment"));
+    document.querySelectorAll(".side-nav .side-item").forEach((item) => item.classList.remove("active"));
+    document.getElementById("sidebarHomeBtn")?.classList.add("active");
   });
 
   document.getElementById("sidebarProfileBtn")?.addEventListener("click", () => {
     switchMainView("credit");
+    document.querySelectorAll(".side-nav .side-item").forEach((item) => item.classList.remove("active"));
+    document.getElementById("sidebarProfileBtn")?.classList.add("active");
+  });
+
+  document.querySelectorAll(".side-nav .side-item").forEach((btn) => {
+    if (btn.id === "sidebarHomeBtn" || btn.id === "sidebarProfileBtn") return;
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".side-nav .side-item").forEach((item) => item.classList.remove("active"));
+      btn.classList.add("active");
+      switchMainView("dashboard");
+      const label = btn.getAttribute("aria-label") || "Section";
+      showToast(`${label} opened.`, "success");
+    });
   });
 }
 
@@ -707,11 +802,41 @@ function startDashboard() {
   });
 
   // Logout
+  const logoutModal = document.getElementById("logoutConfirmModal");
+  const openLogoutConfirm = () => {
+    if (!logoutModal) return;
+    logoutModal.classList.remove("hidden");
+    logoutModal.setAttribute("aria-hidden", "false");
+  };
+  const closeLogoutConfirm = () => {
+    if (!logoutModal) return;
+    logoutModal.classList.add("hidden");
+    logoutModal.setAttribute("aria-hidden", "true");
+  };
+
   document.getElementById("logoutBtn")?.addEventListener("click", () => {
-    const confirmed = window.confirm("Are you sure you want to logout?");
-    if (!confirmed) return;
+    openLogoutConfirm();
+  });
+
+  document.getElementById("logoutConfirmCancel")?.addEventListener("click", () => {
+    closeLogoutConfirm();
+  });
+
+  document.getElementById("logoutConfirmBackdrop")?.addEventListener("click", () => {
+    closeLogoutConfirm();
+  });
+
+  document.getElementById("logoutConfirmOk")?.addEventListener("click", () => {
+    closeLogoutConfirm();
+    closeAllHintModals(false);
     setLoggedIn(false);
     cleanUrl();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && logoutModal && !logoutModal.classList.contains("hidden")) {
+      closeLogoutConfirm();
+    }
   });
 
   document.getElementById("screenshotBtn")?.addEventListener("click", () => {
@@ -721,11 +846,23 @@ function startDashboard() {
   initSystemHintModal();
   initSidebarNavigation();
 
-  // Tabs (UI only)
+  // Tabs — each opens a different home page section
   document.querySelectorAll(".tabs-row .tab").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".tabs-row .tab").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
+      const tab = btn.getAttribute("data-tab") || "payment";
+      applyHomeScene(getCaptureHomeScene(tab));
+      showToast(`${btn.textContent.replace("×", "").trim()} opened.`, "success");
+    });
+  });
+
+  // Feature chips — all clickable
+  document.querySelectorAll(".feature-chips .chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".feature-chips .chip").forEach((c) => {
+        c.classList.remove("is-active", "chip-primary");
+      });
+      chip.classList.add("is-active", "chip-primary");
+      showToast(`${chip.textContent.trim()} selected.`, "success");
     });
   });
 }
