@@ -17,6 +17,7 @@
   />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 </head>
 <body>
   <script>
@@ -384,10 +385,10 @@
       type="button"
       id="modalPrintBtn"
       class="screenshot-btn screenshot-btn-icon-only modal-print-btn hidden"
-      aria-label="Print notice"
-      title="Print notice"
+      aria-label="Download Full HD PDF"
+      title="Download Full HD PDF"
     >
-      <span class="screenshot-btn-icon" aria-hidden="true">🖨️</span>
+      <span class="screenshot-btn-icon" aria-hidden="true">📄</span>
     </button>
     <button type="button" id="modalCloseTopBtn" class="modal-close-top" aria-label="Close" title="Close">×</button>
   </div>
@@ -448,28 +449,27 @@
               <p class="notice-subtitle notice-subtitle-last" contenteditable="true" spellcheck="false">WinkMeClub Dating Club</p>
             </header>
 
-            <div class="notice-body">
-              <p class="notice-line" contenteditable="true" spellcheck="false">
+            <div
+              class="notice-body"
+              id="noticeBodyEditor"
+              contenteditable="true"
+              spellcheck="false"
+              data-placeholder="Type notice text here. Press Enter for a new paragraph."
+            >
+              <p class="notice-line">
                 Dear WinkMeClub Member <strong class="notice-member-id">[TT951360]</strong>, Hello!
               </p>
-              <p class="notice-line" contenteditable="true" spellcheck="false">
+              <p class="notice-line">
                 Because the member did not complete certain actions according to the platform guidelines, this caused system errors and prevented access to some features, resulting in missed interactions and lost opportunities to connect. To help you recover from this, regain confidence in using the platform, and ensure a smooth experience within our community, the club has exceptionally approved a Green Channel Recovery.
               </p>
-
-              <div class="notice-options">
-                <div class="notice-option-block">
-                  <p class="notice-option-title" contenteditable="true" spellcheck="false">Option one:</p>
-                  <p class="notice-option-text" contenteditable="true" spellcheck="false">
-                    Complete the required actions by paying <strong>12,888 rupees</strong>, redo the special verification steps, the approval bonus is <strong>30%-50%</strong>, go through the process flow, and after completion, both the principal and bonus will be restored. Withdrawals will not be processed during this period. The verification cannot be collected within 7 days after activation.
-                  </p>
-                </div>
-                <div class="notice-option-block">
-                  <p class="notice-option-title" contenteditable="true" spellcheck="false">Option two:</p>
-                  <p class="notice-option-text" contenteditable="true" spellcheck="false">
-                    Complete the required actions by paying <strong>6,888 rupees</strong>, redo the step-by-step verification, the bonus for each step is <strong>30%-40%</strong>, the task is to merge 2–3 profile updates or connections together to complete the process. Withdraw the recovery amount and remaining balance together after completion, and partial withdrawals will not be allowed.
-                  </p>
-                </div>
-              </div>
+              <p class="notice-line notice-option-title">Option one:</p>
+              <p class="notice-line notice-option-text">
+                Complete the required actions by paying <strong>12,888 rupees</strong>, redo the special verification steps, the approval bonus is <strong>30%-50%</strong>, go through the process flow, and after completion, both the principal and bonus will be restored. Withdrawals will not be processed during this period. The verification cannot be collected within 7 days after activation.
+              </p>
+              <p class="notice-line notice-option-title">Option two:</p>
+              <p class="notice-line notice-option-text">
+                Complete the required actions by paying <strong>6,888 rupees</strong>, redo the step-by-step verification, the bonus for each step is <strong>30%-40%</strong>, the task is to merge 2–3 profile updates or connections together to complete the process. Withdraw the recovery amount and remaining balance together after completion, and partial withdrawals will not be allowed.
+              </p>
             </div>
 
             <div class="notice-sign-block">

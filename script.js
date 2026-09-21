@@ -128,7 +128,7 @@ function getHintConfig(type) {
       modalId: "noticeModal",
       dialogId: "noticeDialog",
       bodyId: "noticeInner",
-      storageKey: "noticeCertificateContentV15",
+      storageKey: "noticeCertificateContentV16",
       filePrefix: "winkmeclub-notice",
       captureBg: "#2a0c18",
       captureTheme: "notice",
@@ -154,7 +154,8 @@ function toggleModalScreenshotBar(show, type = null) {
   bar.classList.toggle("hidden", !show);
   bar.setAttribute("aria-hidden", show ? "false" : "true");
   if (printBtn) {
-    const showPrint = show && type === "notice";
+    // PDF download available for Large Amount, Reputation, and Notice
+    const showPrint = !!show;
     printBtn.classList.toggle("hidden", !showPrint);
     printBtn.setAttribute("aria-hidden", showPrint ? "false" : "true");
   }
@@ -163,10 +164,20 @@ function toggleModalScreenshotBar(show, type = null) {
 function prepareCaptureSurface(dialog) {
   document.activeElement?.blur?.();
   dialog.classList.add("is-capturing");
+
+  if (dialog.id === "noticeDialog") {
+    const modal = document.getElementById("noticeModal");
+    if (modal) {
+      modal.classList.add("is-capturing-notice");
+      modal.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+  }
 }
 
 function cleanupCaptureSurface(dialog) {
   dialog.classList.remove("is-capturing");
+  document.getElementById("noticeModal")?.classList.remove("is-capturing-notice");
 }
 
 function closeActiveHintModal() {
@@ -427,15 +438,30 @@ async function captureDashboardScreenshot(triggerEl = null) {
 
     await new Promise((resolve) => setTimeout(resolve, 200));
 
+    const isNotice = activeHintModal === "notice";
+    const dialogRect = dialog.getBoundingClientRect();
+    const captureWidth = window.innerWidth;
+    // Notice can grow taller than the viewport — capture the full certificate
+    const captureHeight = isNotice
+      ? Math.ceil(
+          Math.max(
+            window.innerHeight,
+            dialogRect.bottom + 64,
+            dialog.scrollHeight + 120,
+            document.documentElement.scrollHeight
+          )
+        )
+      : window.innerHeight;
+
     const rawCanvas = await window.html2canvas(document.body, {
       backgroundColor: config.captureBg || "#16082a",
       scale: captureScale,
-      width: window.innerWidth,
-      height: window.innerHeight,
-      windowWidth: window.innerWidth,
-      windowHeight: window.innerHeight,
+      width: captureWidth,
+      height: captureHeight,
+      windowWidth: captureWidth,
+      windowHeight: captureHeight,
       x: 0,
-      y: window.scrollY || 0,
+      y: 0,
       scrollX: 0,
       scrollY: 0,
       useCORS: true,
@@ -451,9 +477,24 @@ async function captureDashboardScreenshot(triggerEl = null) {
         const clonedBody = clonedDoc.body;
         if (clonedBody) {
           clonedBody.classList.add("is-capture-home", "is-capture-hd");
-          clonedBody.style.width = `${window.innerWidth}px`;
-          clonedBody.style.height = `${window.innerHeight}px`;
-          clonedBody.style.overflow = "hidden";
+          clonedBody.style.width = `${captureWidth}px`;
+          clonedBody.style.minHeight = `${captureHeight}px`;
+          clonedBody.style.height = isNotice ? "auto" : `${captureHeight}px`;
+          clonedBody.style.overflow = isNotice ? "visible" : "hidden";
+        }
+        const clonedNoticeModal = clonedDoc.getElementById("noticeModal");
+        if (clonedNoticeModal) {
+          clonedNoticeModal.classList.add("is-capturing-notice");
+          clonedNoticeModal.style.overflow = "visible";
+          clonedNoticeModal.style.height = "auto";
+          clonedNoticeModal.style.minHeight = `${captureHeight}px`;
+          clonedNoticeModal.style.position = "absolute";
+          clonedNoticeModal.style.inset = "0 auto auto 0";
+          clonedNoticeModal.style.width = "100%";
+        }
+        const clonedPaper = clonedDoc.querySelector(".notice-paper");
+        if (clonedPaper) {
+          clonedPaper.style.overflow = "visible";
         }
         const brand = clonedDoc.querySelector(".notice-brand-name");
         if (brand) {
@@ -492,9 +533,10 @@ async function captureDashboardScreenshot(triggerEl = null) {
       },
     });
 
-    // Keep native high-res if already Full HD+; otherwise pad/fit to Exact Full HD
+    // Notice: keep full height so every paragraph is in the PNG.
+    // Other modals: ensure at least Full HD canvas size.
     const hdCanvas =
-      rawCanvas.width >= FULL_HD.width && rawCanvas.height >= FULL_HD.height
+      isNotice || (rawCanvas.width >= FULL_HD.width && rawCanvas.height >= FULL_HD.height)
         ? rawCanvas
         : ensureFullHdCanvas(rawCanvas);
 
@@ -523,7 +565,168 @@ async function captureDashboardScreenshot(triggerEl = null) {
   }
 }
 
+function applyNoticeCaptureFixes(clonedDoc) {
+  const brand = clonedDoc.querySelector(".notice-brand-name");
+  if (brand) {
+    brand.style.background = "none";
+    brand.style.webkitBackgroundClip = "border-box";
+    brand.style.backgroundClip = "border-box";
+    brand.style.color = "#e11d48";
+  }
+  const icon = clonedDoc.querySelector(".notice-emblem-icon");
+  if (icon) {
+    icon.style.mixBlendMode = "normal";
+    icon.style.filter = "none";
+    icon.style.opacity = "1";
+  }
+  const scallop = clonedDoc.querySelector(".notice-emblem-scallop");
+  if (scallop) {
+    scallop.style.background = "#fff8fb";
+  }
+  const watermark = clonedDoc.querySelector(".notice-watermark-layer");
+  if (watermark) {
+    watermark.style.opacity = "0.28";
+  }
+  clonedDoc.querySelectorAll(".notice-watermark-item").forEach((el) => {
+    el.style.color = "#5f5f68";
+    el.style.opacity = "1";
+  });
+  clonedDoc.querySelectorAll(".notice-watermark-item img").forEach((img) => {
+    img.style.opacity = "0.95";
+    img.style.filter = "grayscale(1) brightness(0.88) contrast(1.15)";
+  });
+  const paper = clonedDoc.querySelector(".notice-paper");
+  if (paper) paper.style.overflow = "visible";
+}
+
+async function captureModalDialogCanvas(dialog, options = {}) {
+  const scale = options.scale || Math.min(Math.max(getFullHdCaptureScale(), 2.5), 3);
+  const backgroundColor = options.backgroundColor || null;
+
+  return window.html2canvas(dialog, {
+    backgroundColor,
+    scale,
+    useCORS: true,
+    allowTaint: true,
+    logging: false,
+    imageTimeout: 15000,
+    removeContainer: true,
+    scrollX: 0,
+    scrollY: 0,
+    onclone: (clonedDoc) => {
+      const clonedDialog = clonedDoc.getElementById(dialog.id) || clonedDoc.querySelector(`#${dialog.id}`);
+      if (clonedDialog) {
+        clonedDialog.classList.add("is-capturing");
+        clonedDialog.style.width = `${dialog.offsetWidth}px`;
+        clonedDialog.style.maxWidth = "none";
+        clonedDialog.style.margin = "0";
+        clonedDialog.style.transform = "none";
+        clonedDialog.style.overflow = "visible";
+      }
+      applyNoticeCaptureFixes(clonedDoc);
+      if (typeof options.onclone === "function") options.onclone(clonedDoc);
+    },
+  });
+}
+
+function canvasToJpegDataUrl(canvas, quality = 0.95) {
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+async function buildHdPdfFromCanvas(canvas, filename) {
+  const jsPdfNamespace = window.jspdf;
+  const JsPDF = jsPdfNamespace?.jsPDF || window.jsPDF;
+  if (typeof JsPDF !== "function") {
+    throw new Error("PDF library failed to load");
+  }
+
+  // A4-width HD page; height grows with content so nothing is cropped
+  const pdfWidthMm = 210;
+  const pdfHeightMm = Math.max(297, (canvas.height / canvas.width) * pdfWidthMm);
+  const pdf = new JsPDF({
+    orientation: pdfHeightMm >= pdfWidthMm ? "portrait" : "landscape",
+    unit: "mm",
+    format: [pdfWidthMm, pdfHeightMm],
+    compress: true,
+  });
+
+  const imgData = canvasToJpegDataUrl(canvas, 0.96);
+  pdf.addImage(imgData, "JPEG", 0, 0, pdfWidthMm, pdfHeightMm, undefined, "FAST");
+  pdf.save(filename);
+}
+
+async function downloadModalHdPdf(triggerEl = null) {
+  const trigger = triggerEl || document.getElementById("modalPrintBtn");
+
+  if (!activeHintModal) {
+    showToast("Open Large Amount, Reputation Points, or Notice first.", "error");
+    return;
+  }
+  if (typeof window.html2canvas !== "function") {
+    showToast("Screenshot library failed to load.", "error");
+    return;
+  }
+
+  const jsPdfNamespace = window.jspdf;
+  const JsPDF = jsPdfNamespace?.jsPDF || window.jsPDF;
+  if (typeof JsPDF !== "function") {
+    showToast("PDF library failed to load.", "error");
+    return;
+  }
+
+  const config = getHintConfig(activeHintModal);
+  const dialog = document.getElementById(config.dialogId);
+  if (!dialog) return;
+
+  const previousTitle = trigger?.getAttribute("title") || "Download Full HD PDF";
+
+  try {
+    trigger?.classList.add("is-busy");
+    trigger?.setAttribute("aria-busy", "true");
+    trigger?.setAttribute("title", "Building Full HD PDF...");
+
+    prepareCaptureSurface(dialog);
+    document.body.classList.add("is-capture-hd");
+    await new Promise((resolve) => setTimeout(resolve, 180));
+
+    const canvas = await captureModalDialogCanvas(dialog, {
+      backgroundColor: activeHintModal === "notice" ? "#855486" : config.captureBg || "#16082a",
+      scale: 3,
+    });
+
+    // Ensure at least Full HD width pixels for crisp PDF embedding
+    let exportCanvas = canvas;
+    if (canvas.width < FULL_HD.width) {
+      const boosted = document.createElement("canvas");
+      const ratio = FULL_HD.width / canvas.width;
+      boosted.width = FULL_HD.width;
+      boosted.height = Math.round(canvas.height * ratio);
+      const ctx = boosted.getContext("2d");
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(canvas, 0, 0, boosted.width, boosted.height);
+        exportCanvas = boosted;
+      }
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    await buildHdPdfFromCanvas(exportCanvas, `${config.filePrefix}-fullhd-${timestamp}.pdf`);
+    showToast(`${config.toastLabel} Full HD PDF downloaded.`, "success");
+  } catch (error) {
+    console.error(error);
+    showToast("Unable to download Full HD PDF.", "error");
+  } finally {
+    cleanupCaptureSurface(dialog);
+    document.body.classList.remove("is-capture-hd");
+    trigger?.classList.remove("is-busy");
+    trigger?.setAttribute("aria-busy", "false");
+    trigger?.setAttribute("title", previousTitle);
+  }
+}
+
 function printNoticeDocument() {
+  // Kept as fallback: browser print dialog
   if (activeHintModal !== "notice") {
     showToast("Open Notice first to print.", "error");
     return;
@@ -591,6 +794,7 @@ function openSystemHintModal(type = "large") {
     const noticeLogo = document.querySelector(".notice-emblem-icon");
     if (stamp) stamp.textContent = formatNoticeStamp(new Date());
     if (noticeLogo && window.WINK_NOTICE_ICON_SRC) noticeLogo.src = window.WINK_NOTICE_ICON_SRC;
+    normalizeNoticeParagraphs(document.getElementById("noticeBodyEditor"));
   }
 }
 
@@ -640,10 +844,142 @@ function loadHintContent(type) {
   if (body && saved) body.innerHTML = saved;
 }
 
+function normalizeNoticeParagraphs(editor) {
+  if (!editor) return;
+
+  Array.from(editor.childNodes).forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent ?? "";
+      if (!text.trim()) {
+        node.remove();
+        return;
+      }
+      const p = document.createElement("p");
+      p.className = "notice-line";
+      p.textContent = text;
+      editor.replaceChild(p, node);
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const el = node;
+
+    if (el.tagName === "DIV" || el.tagName === "SPAN") {
+      const p = document.createElement("p");
+      p.className = "notice-line";
+      p.innerHTML = el.innerHTML || "<br>";
+      editor.replaceChild(p, el);
+      return;
+    }
+
+    if (el.tagName === "BR") {
+      const p = document.createElement("p");
+      p.className = "notice-line";
+      p.innerHTML = "<br>";
+      editor.replaceChild(p, el);
+      return;
+    }
+
+    if (el.tagName === "P" && !el.classList.contains("notice-line")) {
+      el.classList.add("notice-line");
+    }
+  });
+
+  if (!editor.querySelector("p")) {
+    const p = document.createElement("p");
+    p.className = "notice-line";
+    p.innerHTML = "<br>";
+    editor.appendChild(p);
+  }
+}
+
+function insertNoticeParagraph() {
+  const selection = window.getSelection();
+  if (!selection || !selection.rangeCount) return false;
+
+  const range = selection.getRangeAt(0);
+  range.deleteContents();
+
+  let block = range.startContainer;
+  if (block.nodeType === Node.TEXT_NODE) block = block.parentElement;
+  while (block && block !== document.body) {
+    if (block.nodeType === Node.ELEMENT_NODE && block.tagName === "P") break;
+    block = block.parentElement;
+  }
+
+  const editor = document.getElementById("noticeBodyEditor");
+  if (!editor || !block || !editor.contains(block)) {
+    document.execCommand("insertParagraph", false);
+    return true;
+  }
+
+  const current = block;
+  const newP = document.createElement("p");
+  newP.className = "notice-line";
+  newP.innerHTML = "<br>";
+
+  const afterRange = document.createRange();
+  afterRange.setStart(range.startContainer, range.startOffset);
+  afterRange.setEnd(current, current.childNodes.length);
+  const trailing = afterRange.extractContents();
+  if (trailing.textContent?.trim() || trailing.querySelector?.("img,strong,em,b,i,u")) {
+    newP.innerHTML = "";
+    newP.appendChild(trailing);
+  }
+
+  if (!current.textContent?.trim() && !current.querySelector("img")) {
+    current.innerHTML = "<br>";
+  }
+
+  current.after(newP);
+
+  const nextRange = document.createRange();
+  nextRange.setStart(newP, 0);
+  nextRange.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(nextRange);
+  return true;
+}
+
+function initNoticeFreeEditor() {
+  const editor = document.getElementById("noticeBodyEditor");
+  if (!editor) return;
+
+  editor.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    insertNoticeParagraph();
+    saveHintContent("notice");
+  });
+
+  editor.addEventListener("paste", (event) => {
+    event.preventDefault();
+    const text = event.clipboardData?.getData("text/plain") || "";
+    const lines = text.replace(/\r\n/g, "\n").split("\n");
+    const html = lines
+      .map((line) => `<p class="notice-line">${line ? line.replace(/</g, "&lt;").replace(/>/g, "&gt;") : "<br>"}</p>`)
+      .join("");
+    document.execCommand("insertHTML", false, html || '<p class="notice-line"><br></p>');
+    normalizeNoticeParagraphs(editor);
+    saveHintContent("notice");
+  });
+
+  editor.addEventListener("input", () => {
+    saveHintContent("notice");
+  });
+
+  editor.addEventListener("blur", () => {
+    normalizeNoticeParagraphs(editor);
+    saveHintContent("notice");
+  });
+}
+
 function initSystemHintModal() {
   loadHintContent("large");
   loadHintContent("reputation");
   loadHintContent("notice");
+  normalizeNoticeParagraphs(document.getElementById("noticeBodyEditor"));
+  initNoticeFreeEditor();
 
   document.getElementById("largeAmountBtn")?.addEventListener("click", () => {
     openSystemHintModal("large");
@@ -677,8 +1013,8 @@ function initSystemHintModal() {
     captureDashboardScreenshot(event.currentTarget);
   });
 
-  document.getElementById("modalPrintBtn")?.addEventListener("click", () => {
-    printNoticeDocument();
+  document.getElementById("modalPrintBtn")?.addEventListener("click", (event) => {
+    downloadModalHdPdf(event.currentTarget);
   });
 
   document.getElementById("systemHintBackdrop")?.addEventListener("click", () => {

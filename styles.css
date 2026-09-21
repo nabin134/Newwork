@@ -1824,10 +1824,88 @@ tbody tr:hover {
   background: #ffffff;
   border: 1.5px solid #222;
   margin: 12px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow:
     inset 0 0 0 5px #fff,
     inset 0 0 0 6.5px rgba(120, 70, 125, 0.45);
+}
+
+/* Free-form notice body — unlimited paragraphs */
+.notice-body {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.68;
+  color: #1a1a1a;
+  outline: none;
+  min-height: 120px;
+  cursor: text;
+}
+
+.notice-body:focus {
+  outline: none;
+}
+
+.notice-body .notice-line,
+.notice-body p {
+  margin: 0 0 15px;
+  text-align: left;
+  min-height: 1.2em;
+}
+
+.notice-body .notice-line:last-child,
+.notice-body p:last-child {
+  margin-bottom: 0;
+}
+
+.notice-body .notice-option-title {
+  margin: 12px 0 8px;
+  color: #c41e3a;
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.notice-body .notice-option-text {
+  margin: 0 0 15px;
+  font-size: 0.88rem;
+  line-height: 1.7;
+  color: #1a1a1a;
+}
+
+.notice-body strong,
+.notice-body .notice-member-id {
+  font-weight: 700;
+  color: #111;
+}
+
+/* Expand fully during screenshot so no paragraph is clipped */
+.notice-modal.is-capturing-notice {
+  overflow: visible !important;
+  position: absolute !important;
+  inset: 0 auto auto 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 100vh;
+  padding: 40px 20px 48px !important;
+  display: block !important;
+}
+
+.notice-modal.is-capturing-notice .notice-backdrop {
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+}
+
+.notice-modal.is-capturing-notice .notice-certificate,
+.notice-modal.is-capturing-notice .notice-frame,
+.notice-modal.is-capturing-notice .notice-paper,
+.is-capturing .notice-paper {
+  overflow: visible !important;
+  height: auto !important;
+}
+
+.is-capturing .notice-body {
+  outline: none !important;
 }
 
 /* Subtle paper wavy lines — always visible detailing */
@@ -2024,63 +2102,6 @@ tbody tr:hover {
 
 .notice-subtitle-last {
   margin-bottom: 0;
-}
-
-.notice-body {
-  margin: 0;
-  font-size: 0.88rem;
-  line-height: 1.68;
-  color: #1a1a1a;
-}
-
-.notice-line {
-  margin: 0 0 15px;
-  text-align: left;
-}
-
-.notice-member-id,
-.notice-line strong,
-.notice-option-block strong {
-  font-weight: 700;
-  color: #111;
-}
-
-.notice-options {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  margin: 6px 0 0;
-  clear: both;
-}
-
-.notice-option-block {
-  margin: 0;
-  display: block;
-  width: 100%;
-}
-
-.notice-option-title {
-  margin: 0 0 8px;
-  color: #c41e3a;
-  font-weight: 700;
-  font-size: 0.9rem;
-  line-height: 1.35;
-  display: block;
-}
-
-.notice-option-text {
-  margin: 0;
-  padding: 0;
-  display: block;
-  text-align: left;
-  font-size: 0.88rem;
-  line-height: 1.7;
-  color: #1a1a1a;
-}
-
-.notice-option-text strong {
-  font-weight: 700;
-  color: #111;
 }
 
 .notice-sign-block {
