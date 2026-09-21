@@ -744,6 +744,28 @@ button,
   line-height: 1;
 }
 
+.screenshot-btn-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.modal-print-btn:not(.hidden) {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  color: #fff;
+  border: 1px solid rgba(236, 72, 153, 0.45);
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.35), rgba(168, 85, 247, 0.28));
+  box-shadow: 0 0 0 1px rgba(236, 72, 153, 0.18), 0 10px 26px rgba(236, 72, 153, 0.2);
+}
+
 .topbar-center {
   display: flex;
   justify-content: center;

@@ -409,156 +409,56 @@ async function captureDashboardScreenshot(triggerEl = null) {
 
   const config = getHintConfig(activeHintModal);
   const dialog = document.getElementById(config.dialogId);
-  const dashboard = document.getElementById("dashboardScreen");
   if (!dialog) return;
 
-  const previousTitle = trigger.getAttribute("title") || "Take screenshot";
-  const themeClass = `capture-theme-${config.captureTheme || "large"}`;
-  const previousScene = snapshotHomeScene();
-  const captureScene = getCaptureHomeScene(activeHintModal);
-  const captureScale = getFullHdCaptureScale();
+  const previousTitle = trigger.getAttribute("title") || "Take Full HD screenshot";
+  const isNotice = activeHintModal === "notice";
 
   try {
     trigger.classList.add("is-busy");
     trigger.setAttribute("aria-busy", "true");
     trigger.setAttribute("title", "Capturing Full HD...");
 
-    // Each modal screenshot uses a different home page section
-    applyHomeScene(captureScene);
+    // Capture only the open modal/certificate — not the dashboard behind it
     prepareCaptureSurface(dialog);
-    document.body.classList.add("is-capture-home", "is-capture-hd");
-    if (dashboard) {
-      dashboard.classList.remove(
-        "capture-theme-large",
-        "capture-theme-reputation",
-        "capture-theme-notice"
-      );
-      dashboard.classList.add(themeClass);
+    document.body.classList.add("is-capture-hd");
+    if (isNotice) {
+      const modal = document.getElementById("noticeModal");
+      if (modal) modal.scrollTop = 0;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 180));
 
-    const isNotice = activeHintModal === "notice";
-    const dialogRect = dialog.getBoundingClientRect();
-    const captureWidth = window.innerWidth;
-    // Notice can grow taller than the viewport — capture the full certificate
-    const captureHeight = isNotice
-      ? Math.ceil(
-          Math.max(
-            window.innerHeight,
-            dialogRect.bottom + 64,
-            dialog.scrollHeight + 120,
-            document.documentElement.scrollHeight
-          )
-        )
-      : window.innerHeight;
-
-    const rawCanvas = await window.html2canvas(document.body, {
-      backgroundColor: config.captureBg || "#16082a",
-      scale: captureScale,
-      width: captureWidth,
-      height: captureHeight,
-      windowWidth: captureWidth,
-      windowHeight: captureHeight,
-      x: 0,
-      y: 0,
-      scrollX: 0,
-      scrollY: 0,
-      useCORS: true,
-      allowTaint: true,
-      logging: false,
-      imageTimeout: 15000,
-      removeContainer: true,
-      ignoreElements: (el) =>
-        el.id === "modalScreenshotBar" ||
-        el.id === "screenshotToast" ||
-        el.id === "loginScreen",
-      onclone: (clonedDoc) => {
-        const clonedBody = clonedDoc.body;
-        if (clonedBody) {
-          clonedBody.classList.add("is-capture-home", "is-capture-hd");
-          clonedBody.style.width = `${captureWidth}px`;
-          clonedBody.style.minHeight = `${captureHeight}px`;
-          clonedBody.style.height = isNotice ? "auto" : `${captureHeight}px`;
-          clonedBody.style.overflow = isNotice ? "visible" : "hidden";
-        }
-        const clonedNoticeModal = clonedDoc.getElementById("noticeModal");
-        if (clonedNoticeModal) {
-          clonedNoticeModal.classList.add("is-capturing-notice");
-          clonedNoticeModal.style.overflow = "visible";
-          clonedNoticeModal.style.height = "auto";
-          clonedNoticeModal.style.minHeight = `${captureHeight}px`;
-          clonedNoticeModal.style.position = "absolute";
-          clonedNoticeModal.style.inset = "0 auto auto 0";
-          clonedNoticeModal.style.width = "100%";
-        }
-        const clonedPaper = clonedDoc.querySelector(".notice-paper");
-        if (clonedPaper) {
-          clonedPaper.style.overflow = "visible";
-        }
-        const brand = clonedDoc.querySelector(".notice-brand-name");
-        if (brand) {
-          brand.style.background = "none";
-          brand.style.webkitBackgroundClip = "border-box";
-          brand.style.backgroundClip = "border-box";
-          brand.style.color = "#e11d48";
-        }
-        const icon = clonedDoc.querySelector(".notice-emblem-icon");
-        if (icon) {
-          icon.style.mixBlendMode = "normal";
-          icon.style.filter = "none";
-          icon.style.opacity = "1";
-        }
-        const scallop = clonedDoc.querySelector(".notice-emblem-scallop");
-        if (scallop) {
-          scallop.style.background = "#fff8fb";
-        }
-        const watermark = clonedDoc.querySelector(".notice-watermark-layer");
-        if (watermark) {
-          watermark.style.opacity = "0.28";
-        }
-        clonedDoc.querySelectorAll(".notice-watermark-item").forEach((el) => {
-          el.style.color = "#5f5f68";
-          el.style.opacity = "1";
-        });
-        clonedDoc.querySelectorAll(".notice-watermark-item img").forEach((img) => {
-          img.style.opacity = "0.95";
-          img.style.filter = "grayscale(1) brightness(0.88) contrast(1.15)";
-        });
-        const clonedDash = clonedDoc.getElementById("dashboardScreen");
-        if (clonedDash) {
-          clonedDash.classList.add(themeClass);
-          clonedDash.classList.remove("hidden");
-        }
-      },
+    const rawCanvas = await captureModalDialogCanvas(dialog, {
+      backgroundColor: isNotice ? "#855486" : config.captureBg || "#16082a",
+      scale: 3,
     });
 
-    // Notice: keep full height so every paragraph is in the PNG.
-    // Other modals: ensure at least Full HD canvas size.
-    const hdCanvas =
-      isNotice || (rawCanvas.width >= FULL_HD.width && rawCanvas.height >= FULL_HD.height)
-        ? rawCanvas
-        : ensureFullHdCanvas(rawCanvas);
+    // Boost to at least Full HD width for crisp desktop screenshots
+    let hdCanvas = rawCanvas;
+    if (rawCanvas.width < FULL_HD.width) {
+      const boosted = document.createElement("canvas");
+      const ratio = FULL_HD.width / rawCanvas.width;
+      boosted.width = FULL_HD.width;
+      boosted.height = Math.round(rawCanvas.height * ratio);
+      const ctx = boosted.getContext("2d");
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(rawCanvas, 0, 0, boosted.width, boosted.height);
+        hdCanvas = boosted;
+      }
+    }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     await downloadPngCanvas(hdCanvas, `${config.filePrefix}-fullhd-${timestamp}.png`);
-
     showToast(`${config.toastLabel} Full HD screenshot downloaded.`, "success");
   } catch (error) {
     console.error(error);
     showToast("Unable to capture screenshot.", "error");
   } finally {
     cleanupCaptureSurface(dialog);
-    document.body.classList.remove("is-capture-home", "is-capture-hd");
-    if (activeHintModal) {
-      applyHomeScene(getCaptureHomeScene(activeHintModal));
-      applyDashboardTheme(activeHintModal);
-      setModalHomeVisible(true);
-    } else {
-      applyHomeScene(previousScene);
-      clearDashboardTheme();
-      setModalHomeVisible(false);
-    }
+    document.body.classList.remove("is-capture-hd");
     trigger.classList.remove("is-busy");
     trigger.setAttribute("aria-busy", "false");
     trigger.setAttribute("title", previousTitle);
@@ -602,26 +502,47 @@ function applyNoticeCaptureFixes(clonedDoc) {
 async function captureModalDialogCanvas(dialog, options = {}) {
   const scale = options.scale || Math.min(Math.max(getFullHdCaptureScale(), 2.5), 3);
   const backgroundColor = options.backgroundColor || null;
+  const width = Math.max(dialog.scrollWidth, dialog.offsetWidth, 1);
+  const height = Math.max(dialog.scrollHeight, dialog.offsetHeight, 1);
 
   return window.html2canvas(dialog, {
     backgroundColor,
     scale,
+    width,
+    height,
+    windowWidth: width,
+    windowHeight: height,
     useCORS: true,
     allowTaint: true,
     logging: false,
-    imageTimeout: 15000,
+    imageTimeout: 20000,
     removeContainer: true,
     scrollX: 0,
-    scrollY: 0,
-    onclone: (clonedDoc) => {
-      const clonedDialog = clonedDoc.getElementById(dialog.id) || clonedDoc.querySelector(`#${dialog.id}`);
+    scrollY: -window.scrollY,
+    onclone: (clonedDoc, clonedElement) => {
+      const clonedDialog =
+        clonedElement ||
+        clonedDoc.getElementById(dialog.id) ||
+        clonedDoc.querySelector(`#${dialog.id}`);
       if (clonedDialog) {
         clonedDialog.classList.add("is-capturing");
-        clonedDialog.style.width = `${dialog.offsetWidth}px`;
+        clonedDialog.style.position = "relative";
+        clonedDialog.style.left = "0";
+        clonedDialog.style.top = "0";
+        clonedDialog.style.width = `${width}px`;
         clonedDialog.style.maxWidth = "none";
         clonedDialog.style.margin = "0";
         clonedDialog.style.transform = "none";
         clonedDialog.style.overflow = "visible";
+        clonedDialog.style.height = "auto";
+      }
+      const clonedModal = clonedDoc.getElementById("noticeModal");
+      if (clonedModal) {
+        clonedModal.style.position = "static";
+        clonedModal.style.overflow = "visible";
+        clonedModal.style.height = "auto";
+        clonedModal.style.padding = "0";
+        clonedModal.style.display = "block";
       }
       applyNoticeCaptureFixes(clonedDoc);
       if (typeof options.onclone === "function") options.onclone(clonedDoc);
@@ -629,20 +550,41 @@ async function captureModalDialogCanvas(dialog, options = {}) {
   });
 }
 
+function getJsPdfConstructor() {
+  return window.jspdf?.jsPDF || window.jsPDF || null;
+}
+
 function canvasToJpegDataUrl(canvas, quality = 0.95) {
-  return canvas.toDataURL("image/jpeg", quality);
+  try {
+    return canvas.toDataURL("image/jpeg", quality);
+  } catch (error) {
+    // Fallback if canvas is tainted
+    return canvas.toDataURL("image/png");
+  }
+}
+
+function downloadBlobFile(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 async function buildHdPdfFromCanvas(canvas, filename) {
-  const jsPdfNamespace = window.jspdf;
-  const JsPDF = jsPdfNamespace?.jsPDF || window.jsPDF;
+  const JsPDF = getJsPdfConstructor();
   if (typeof JsPDF !== "function") {
     throw new Error("PDF library failed to load");
   }
 
   // A4-width HD page; height grows with content so nothing is cropped
   const pdfWidthMm = 210;
-  const pdfHeightMm = Math.max(297, (canvas.height / canvas.width) * pdfWidthMm);
+  const pdfHeightMm = Math.max(297, (canvas.height / Math.max(canvas.width, 1)) * pdfWidthMm);
   const pdf = new JsPDF({
     orientation: pdfHeightMm >= pdfWidthMm ? "portrait" : "landscape",
     unit: "mm",
@@ -651,8 +593,12 @@ async function buildHdPdfFromCanvas(canvas, filename) {
   });
 
   const imgData = canvasToJpegDataUrl(canvas, 0.96);
-  pdf.addImage(imgData, "JPEG", 0, 0, pdfWidthMm, pdfHeightMm, undefined, "FAST");
-  pdf.save(filename);
+  const format = imgData.startsWith("data:image/png") ? "PNG" : "JPEG";
+  pdf.addImage(imgData, format, 0, 0, pdfWidthMm, pdfHeightMm, undefined, "FAST");
+
+  // Blob download works reliably on laptop/desktop Chrome, Edge, Firefox
+  const blob = pdf.output("blob");
+  downloadBlobFile(blob, filename);
 }
 
 async function downloadModalHdPdf(triggerEl = null) {
@@ -666,11 +612,8 @@ async function downloadModalHdPdf(triggerEl = null) {
     showToast("Screenshot library failed to load.", "error");
     return;
   }
-
-  const jsPdfNamespace = window.jspdf;
-  const JsPDF = jsPdfNamespace?.jsPDF || window.jsPDF;
-  if (typeof JsPDF !== "function") {
-    showToast("PDF library failed to load.", "error");
+  if (typeof getJsPdfConstructor() !== "function") {
+    showToast("PDF library failed to load. Refresh the page and try again.", "error");
     return;
   }
 
@@ -679,6 +622,7 @@ async function downloadModalHdPdf(triggerEl = null) {
   if (!dialog) return;
 
   const previousTitle = trigger?.getAttribute("title") || "Download Full HD PDF";
+  const isNotice = activeHintModal === "notice";
 
   try {
     trigger?.classList.add("is-busy");
@@ -687,14 +631,18 @@ async function downloadModalHdPdf(triggerEl = null) {
 
     prepareCaptureSurface(dialog);
     document.body.classList.add("is-capture-hd");
+    if (isNotice) {
+      const modal = document.getElementById("noticeModal");
+      if (modal) modal.scrollTop = 0;
+    }
     await new Promise((resolve) => setTimeout(resolve, 180));
 
     const canvas = await captureModalDialogCanvas(dialog, {
-      backgroundColor: activeHintModal === "notice" ? "#855486" : config.captureBg || "#16082a",
+      backgroundColor: isNotice ? "#855486" : config.captureBg || "#16082a",
       scale: 3,
     });
 
-    // Ensure at least Full HD width pixels for crisp PDF embedding
+    // Ensure at least Full HD width pixels for crisp PDF on desktop screens
     let exportCanvas = canvas;
     if (canvas.width < FULL_HD.width) {
       const boosted = document.createElement("canvas");
