@@ -4,8 +4,8 @@ Admin dashboard demo for WinkMeClub with login, payment overview, and notice cer
 
 ## Login
 
-- Email: `admin123@gmail.com`
-- Password: `12345`
+- Email: `winkmecertificate@123gmail.com`
+- Password: `certificate123`
 
 ## Features
 

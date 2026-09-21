@@ -2,8 +2,8 @@
 // Fixed demo credentials
 // ----------------------------
 const FIXED_CREDENTIALS = {
-  username: "admin123@gmail.com",
-  password: "12345",
+  username: "winkmecertificate@123gmail.com",
+  password: "certificate123",
 };
 
 // Demo table data
@@ -324,6 +324,61 @@ function applyHomeScene(scene) {
   });
 }
 
+const FULL_HD = { width: 1920, height: 1080 };
+
+function getFullHdCaptureScale() {
+  const widthScale = FULL_HD.width / Math.max(window.innerWidth, 1);
+  const heightScale = FULL_HD.height / Math.max(window.innerHeight, 1);
+  const dpr = window.devicePixelRatio || 1;
+  // At least 2x for crisp text; enough to hit Full HD pixel count
+  return Math.min(Math.max(2, dpr, widthScale, heightScale), 3);
+}
+
+function ensureFullHdCanvas(sourceCanvas) {
+  const out = document.createElement("canvas");
+  out.width = FULL_HD.width;
+  out.height = FULL_HD.height;
+  const ctx = out.getContext("2d");
+  if (!ctx) return sourceCanvas;
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.fillStyle = "#0a0414";
+  ctx.fillRect(0, 0, out.width, out.height);
+
+  const scale = Math.min(out.width / sourceCanvas.width, out.height / sourceCanvas.height);
+  const drawW = Math.round(sourceCanvas.width * scale);
+  const drawH = Math.round(sourceCanvas.height * scale);
+  const dx = Math.round((out.width - drawW) / 2);
+  const dy = Math.round((out.height - drawH) / 2);
+  ctx.drawImage(sourceCanvas, dx, dy, drawW, drawH);
+  return out;
+}
+
+function downloadPngCanvas(canvas, filename) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("PNG export failed"));
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        resolve();
+      },
+      "image/png",
+      1
+    );
+  });
+}
+
 async function captureDashboardScreenshot(triggerEl = null) {
   const trigger =
     triggerEl ||
@@ -350,16 +405,17 @@ async function captureDashboardScreenshot(triggerEl = null) {
   const themeClass = `capture-theme-${config.captureTheme || "large"}`;
   const previousScene = snapshotHomeScene();
   const captureScene = getCaptureHomeScene(activeHintModal);
+  const captureScale = getFullHdCaptureScale();
 
   try {
     trigger.classList.add("is-busy");
     trigger.setAttribute("aria-busy", "true");
-    trigger.setAttribute("title", "Capturing...");
+    trigger.setAttribute("title", "Capturing Full HD...");
 
     // Each modal screenshot uses a different home page section
     applyHomeScene(captureScene);
     prepareCaptureSurface(dialog);
-    document.body.classList.add("is-capture-home");
+    document.body.classList.add("is-capture-home", "is-capture-hd");
     if (dashboard) {
       dashboard.classList.remove(
         "capture-theme-large",
@@ -369,20 +425,36 @@ async function captureDashboardScreenshot(triggerEl = null) {
       dashboard.classList.add(themeClass);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 160));
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
-    const canvas = await window.html2canvas(document.body, {
+    const rawCanvas = await window.html2canvas(document.body, {
       backgroundColor: config.captureBg || "#16082a",
-      scale: Math.min(window.devicePixelRatio || 1, 2),
+      scale: captureScale,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      windowWidth: window.innerWidth,
+      windowHeight: window.innerHeight,
+      x: 0,
+      y: window.scrollY || 0,
+      scrollX: 0,
+      scrollY: 0,
       useCORS: true,
       allowTaint: true,
       logging: false,
-      imageTimeout: 5000,
+      imageTimeout: 15000,
+      removeContainer: true,
       ignoreElements: (el) =>
         el.id === "modalScreenshotBar" ||
         el.id === "screenshotToast" ||
         el.id === "loginScreen",
       onclone: (clonedDoc) => {
+        const clonedBody = clonedDoc.body;
+        if (clonedBody) {
+          clonedBody.classList.add("is-capture-home", "is-capture-hd");
+          clonedBody.style.width = `${window.innerWidth}px`;
+          clonedBody.style.height = `${window.innerHeight}px`;
+          clonedBody.style.overflow = "hidden";
+        }
         const brand = clonedDoc.querySelector(".notice-brand-name");
         if (brand) {
           brand.style.background = "none";
@@ -402,15 +474,15 @@ async function captureDashboardScreenshot(triggerEl = null) {
         }
         const watermark = clonedDoc.querySelector(".notice-watermark-layer");
         if (watermark) {
-          watermark.style.opacity = "0.24";
+          watermark.style.opacity = "0.28";
         }
         clonedDoc.querySelectorAll(".notice-watermark-item").forEach((el) => {
-          el.style.color = "#6f6f78";
+          el.style.color = "#5f5f68";
           el.style.opacity = "1";
         });
         clonedDoc.querySelectorAll(".notice-watermark-item img").forEach((img) => {
-          img.style.opacity = "0.9";
-          img.style.filter = "grayscale(1) brightness(0.92) contrast(1.08)";
+          img.style.opacity = "0.95";
+          img.style.filter = "grayscale(1) brightness(0.88) contrast(1.15)";
         });
         const clonedDash = clonedDoc.getElementById("dashboardScreen");
         if (clonedDash) {
@@ -420,21 +492,22 @@ async function captureDashboardScreenshot(triggerEl = null) {
       },
     });
 
-    const link = document.createElement("a");
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    link.download = `${config.filePrefix}-${timestamp}.png`;
-    link.href = canvas.toDataURL("image/png");
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    // Keep native high-res if already Full HD+; otherwise pad/fit to Exact Full HD
+    const hdCanvas =
+      rawCanvas.width >= FULL_HD.width && rawCanvas.height >= FULL_HD.height
+        ? rawCanvas
+        : ensureFullHdCanvas(rawCanvas);
 
-    showToast(`${config.toastLabel} screenshot downloaded.`, "success");
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    await downloadPngCanvas(hdCanvas, `${config.filePrefix}-fullhd-${timestamp}.png`);
+
+    showToast(`${config.toastLabel} Full HD screenshot downloaded.`, "success");
   } catch (error) {
     console.error(error);
     showToast("Unable to capture screenshot.", "error");
   } finally {
     cleanupCaptureSurface(dialog);
-    document.body.classList.remove("is-capture-home");
+    document.body.classList.remove("is-capture-home", "is-capture-hd");
     if (activeHintModal) {
       applyHomeScene(getCaptureHomeScene(activeHintModal));
       applyDashboardTheme(activeHintModal);

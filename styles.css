@@ -139,6 +139,82 @@ body {
   visibility: hidden !important;
 }
 
+/* Full HD capture: sharper type & larger modal content for Large / Reputation / Notice */
+.is-capture-hd,
+.is-capture-hd * {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
+
+.is-capture-hd .system-hint-dialog {
+  width: min(640px, 92vw);
+  border-width: 1.5px;
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.5), 0 0 36px rgba(236, 72, 153, 0.22);
+}
+
+.is-capture-hd .system-hint-header {
+  padding: 14px 18px;
+  font-size: 1.18rem;
+  letter-spacing: 0.02em;
+}
+
+.is-capture-hd .system-hint-body {
+  padding: 20px 22px;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.is-capture-hd .hint-line {
+  margin-bottom: 14px;
+}
+
+.is-capture-hd .hint-highlight {
+  font-weight: 900;
+}
+
+.is-capture-hd .system-hint-ok {
+  min-width: 132px;
+  height: 42px;
+  font-size: 1rem;
+}
+
+.is-capture-hd .notice-certificate {
+  width: min(860px, 94vw);
+}
+
+.is-capture-hd .notice-inner {
+  padding: 40px 54px 30px;
+}
+
+.is-capture-hd .notice-brand-name {
+  font-size: 2.15rem;
+}
+
+.is-capture-hd .notice-subtitle {
+  font-size: 1.12rem;
+}
+
+.is-capture-hd .notice-body {
+  font-size: 0.98rem;
+  line-height: 1.72;
+}
+
+.is-capture-hd .notice-watermark-layer {
+  opacity: 0.26;
+}
+
+.is-capture-hd .notice-watermark-item {
+  font-size: 0.95rem;
+  color: #5c5c66;
+}
+
+.is-capture-hd .notice-watermark-item img {
+  width: 28px;
+  height: 28px;
+  opacity: 0.92;
+}
+
 button,
 .chip,
 .tab,
