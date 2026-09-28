@@ -385,7 +385,7 @@ function ensureFullHdCanvas(sourceCanvas) {
   return out;
 }
 
-/** Always output exact A4 HD pixels; pad short content, fit long content. */
+/** Stretch certificate to fill exact A4 HD — no purple letterbox margins. */
 function ensureA4HdCanvas(sourceCanvas, backgroundColor = NOTICE_CAPTURE_BG) {
   const out = document.createElement("canvas");
   out.width = A4_HD.width;
@@ -397,13 +397,8 @@ function ensureA4HdCanvas(sourceCanvas, backgroundColor = NOTICE_CAPTURE_BG) {
   ctx.imageSmoothingQuality = "high";
   ctx.fillStyle = backgroundColor;
   ctx.fillRect(0, 0, out.width, out.height);
-
-  const scale = Math.min(out.width / sourceCanvas.width, out.height / sourceCanvas.height);
-  const drawW = Math.round(sourceCanvas.width * scale);
-  const drawH = Math.round(sourceCanvas.height * scale);
-  const dx = Math.round((out.width - drawW) / 2);
-  const dy = Math.round((out.height - drawH) / 2);
-  ctx.drawImage(sourceCanvas, dx, dy, drawW, drawH);
+  // Fill entire A4 page edge-to-edge (like a real printed notice)
+  ctx.drawImage(sourceCanvas, 0, 0, out.width, out.height);
   return out;
 }
 
@@ -415,39 +410,50 @@ function applyNoticeA4Layout(dialog) {
   dialog.style.width = `${A4_CSS_WIDTH}px`;
   dialog.style.maxWidth = "none";
   dialog.style.minHeight = `${a4Height}px`;
-  dialog.style.height = "auto";
+  dialog.style.height = `${a4Height}px`;
   dialog.style.boxSizing = "border-box";
+  dialog.style.overflow = "hidden";
 
   const frame = dialog.querySelector(".notice-frame");
   const paper = dialog.querySelector(".notice-paper");
   const inner = dialog.querySelector(".notice-inner");
   const body = dialog.querySelector(".notice-body");
+  const signBlock = dialog.querySelector(".notice-sign-block");
 
   if (frame) {
-    frame.style.minHeight = `${a4Height - 8}px`;
-    frame.style.height = "auto";
+    frame.style.width = "100%";
+    frame.style.height = "100%";
+    frame.style.minHeight = "100%";
     frame.style.boxSizing = "border-box";
     frame.style.display = "flex";
     frame.style.flexDirection = "column";
+    frame.style.padding = "16px";
   }
   if (paper) {
     paper.style.flex = "1 1 auto";
-    paper.style.minHeight = `${Math.max(a4Height - 56, 900)}px`;
+    paper.style.width = "100%";
+    paper.style.minHeight = "0";
     paper.style.height = "auto";
+    paper.style.margin = "0";
     paper.style.display = "flex";
     paper.style.flexDirection = "column";
     paper.style.boxSizing = "border-box";
+    paper.style.overflow = "hidden";
   }
   if (inner) {
     inner.style.flex = "1 1 auto";
-    inner.style.minHeight = "100%";
+    inner.style.minHeight = "0";
+    inner.style.height = "100%";
     inner.style.display = "flex";
     inner.style.flexDirection = "column";
     inner.style.boxSizing = "border-box";
   }
   if (body) {
     body.style.flex = "1 1 auto";
-    body.style.minHeight = "160px";
+    body.style.minHeight = "80px";
+  }
+  if (signBlock) {
+    signBlock.style.marginTop = "auto";
   }
 }
 
@@ -459,16 +465,22 @@ function clearNoticeA4Layout(dialog) {
   dialog.style.minHeight = "";
   dialog.style.height = "";
   dialog.style.boxSizing = "";
+  dialog.style.overflow = "";
 
-  [".notice-frame", ".notice-paper", ".notice-inner", ".notice-body"].forEach((sel) => {
+  [".notice-frame", ".notice-paper", ".notice-inner", ".notice-body", ".notice-sign-block"].forEach((sel) => {
     const el = dialog.querySelector(sel);
     if (!el) return;
     el.style.minHeight = "";
     el.style.height = "";
+    el.style.width = "";
+    el.style.margin = "";
+    el.style.marginTop = "";
+    el.style.padding = "";
     el.style.flex = "";
     el.style.display = "";
     el.style.flexDirection = "";
     el.style.boxSizing = "";
+    el.style.overflow = "";
   });
 }
 
@@ -604,18 +616,19 @@ function applyNoticeCaptureFixes(clonedDoc) {
   }
   const watermark = clonedDoc.querySelector(".notice-watermark-layer");
   if (watermark) {
-    watermark.style.opacity = "0.28";
+    // Keep watermark barely visible (html2canvas tends to boost low opacity)
+    watermark.style.opacity = "0.045";
   }
   clonedDoc.querySelectorAll(".notice-watermark-item").forEach((el) => {
-    el.style.color = "#5f5f68";
-    el.style.opacity = "1";
+    el.style.color = "#b0b0b8";
+    el.style.opacity = "0.55";
   });
   clonedDoc.querySelectorAll(".notice-watermark-item img").forEach((img) => {
-    img.style.opacity = "0.95";
-    img.style.filter = "grayscale(1) brightness(0.88) contrast(1.15)";
+    img.style.opacity = "0.4";
+    img.style.filter = "grayscale(1) brightness(1.25) contrast(0.85)";
   });
   const paper = clonedDoc.querySelector(".notice-paper");
-  if (paper) paper.style.overflow = "visible";
+  if (paper) paper.style.overflow = "hidden";
 }
 
 async function captureModalDialogCanvas(dialog, options = {}) {
@@ -629,8 +642,8 @@ async function captureModalDialogCanvas(dialog, options = {}) {
 
   if (forceA4) {
     width = A4_CSS_WIDTH;
-    // Keep at least full A4 height so short edited text still fills the page
-    height = Math.max(height, a4CssHeight, dialog.scrollHeight, 1);
+    // Exact A4 page — certificate fills the whole sheet (no outer purple pad)
+    height = a4CssHeight;
   }
 
   return window.html2canvas(dialog, {
@@ -661,39 +674,52 @@ async function captureModalDialogCanvas(dialog, options = {}) {
         clonedDialog.style.maxWidth = "none";
         clonedDialog.style.margin = "0";
         clonedDialog.style.transform = "none";
-        clonedDialog.style.overflow = "visible";
-        clonedDialog.style.height = "auto";
+        clonedDialog.style.overflow = "hidden";
         if (forceA4) {
           clonedDialog.classList.add("is-a4-capture");
+          clonedDialog.style.height = `${a4CssHeight}px`;
           clonedDialog.style.minHeight = `${a4CssHeight}px`;
           const frame = clonedDialog.querySelector(".notice-frame");
           const paper = clonedDialog.querySelector(".notice-paper");
           const inner = clonedDialog.querySelector(".notice-inner");
           const body = clonedDialog.querySelector(".notice-body");
+          const signBlock = clonedDialog.querySelector(".notice-sign-block");
           if (frame) {
-            frame.style.minHeight = `${a4CssHeight - 8}px`;
+            frame.style.width = "100%";
+            frame.style.height = "100%";
+            frame.style.minHeight = "100%";
             frame.style.display = "flex";
             frame.style.flexDirection = "column";
             frame.style.boxSizing = "border-box";
+            frame.style.padding = "16px";
           }
           if (paper) {
             paper.style.flex = "1 1 auto";
-            paper.style.minHeight = `${Math.max(a4CssHeight - 56, 900)}px`;
+            paper.style.width = "100%";
+            paper.style.minHeight = "0";
+            paper.style.margin = "0";
             paper.style.display = "flex";
             paper.style.flexDirection = "column";
             paper.style.boxSizing = "border-box";
-            paper.style.overflow = "visible";
+            paper.style.overflow = "hidden";
           }
           if (inner) {
             inner.style.flex = "1 1 auto";
-            inner.style.minHeight = "100%";
+            inner.style.minHeight = "0";
+            inner.style.height = "100%";
             inner.style.display = "flex";
             inner.style.flexDirection = "column";
           }
           if (body) {
             body.style.flex = "1 1 auto";
-            body.style.minHeight = "160px";
+            body.style.minHeight = "80px";
           }
+          if (signBlock) {
+            signBlock.style.marginTop = "auto";
+          }
+        } else {
+          clonedDialog.style.height = "auto";
+          clonedDialog.style.overflow = "visible";
         }
       }
       const clonedModal = clonedDoc.getElementById("noticeModal");
@@ -759,17 +785,10 @@ async function buildHdPdfFromCanvas(canvas, filename, options = {}) {
   const format = imgData.startsWith("data:image/png") ? "PNG" : "JPEG";
 
   if (forceA4) {
-    // Fit image inside fixed A4 (pad if short content already padded on canvas)
+    // Certificate already fills A4 canvas — print full page, no margins
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const scale = Math.min(pageW / canvas.width, pageH / canvas.height);
-    const drawW = canvas.width * scale;
-    const drawH = canvas.height * scale;
-    const x = (pageW - drawW) / 2;
-    const y = (pageH - drawH) / 2;
-    pdf.setFillColor(133, 84, 134);
-    pdf.rect(0, 0, pageW, pageH, "F");
-    pdf.addImage(imgData, format, x, y, drawW, drawH, undefined, "FAST");
+    pdf.addImage(imgData, format, 0, 0, pageW, pageH, undefined, "FAST");
   } else {
     pdf.addImage(imgData, format, 0, 0, pdfWidthMm, pdfHeightMm, undefined, "FAST");
   }

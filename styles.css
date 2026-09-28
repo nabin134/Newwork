@@ -185,28 +185,37 @@ body {
 
 .is-capture-hd .notice-certificate.is-a4-capture {
   width: 794px;
+  height: 1123px; /* exact A4 at ~96dpi — fills page edge to edge */
   max-width: none;
-  min-height: 1123px; /* A4 at ~96dpi */
+  min-height: 1123px;
+  overflow: hidden;
 }
 
 .is-capture-hd .notice-certificate.is-a4-capture .notice-frame {
-  min-height: 1115px;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  padding: 16px;
 }
 
 .is-capture-hd .notice-certificate.is-a4-capture .notice-paper {
   flex: 1 1 auto;
-  min-height: 1060px;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .is-capture-hd .notice-certificate.is-a4-capture .notice-inner {
   flex: 1 1 auto;
-  min-height: 100%;
+  min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -214,7 +223,11 @@ body {
 
 .is-capture-hd .notice-certificate.is-a4-capture .notice-body {
   flex: 1 1 auto;
-  min-height: 160px;
+  min-height: 80px;
+}
+
+.is-capture-hd .notice-certificate.is-a4-capture .notice-sign-block {
+  margin-top: auto;
 }
 
 .is-capture-hd .notice-inner {
@@ -235,18 +248,18 @@ body {
 }
 
 .is-capture-hd .notice-watermark-layer {
-  opacity: 0.26;
+  opacity: 0.05;
 }
 
 .is-capture-hd .notice-watermark-item {
-  font-size: 0.95rem;
-  color: #5c5c66;
+  font-size: 0.88rem;
+  color: #b8b8c0;
 }
 
 .is-capture-hd .notice-watermark-item img {
-  width: 28px;
-  height: 28px;
-  opacity: 0.92;
+  width: 24px;
+  height: 24px;
+  opacity: 0.35;
 }
 
 button,
@@ -1934,7 +1947,7 @@ tbody tr:hover {
   color: #111;
 }
 
-/* Expand fully during screenshot so no paragraph is clipped */
+/* A4 capture: lock certificate to page size (no outer purple pad) */
 .notice-modal.is-capturing-notice {
   overflow: visible !important;
   position: absolute !important;
@@ -1952,12 +1965,13 @@ tbody tr:hover {
   min-height: 100%;
 }
 
-.notice-modal.is-capturing-notice .notice-certificate,
-.notice-modal.is-capturing-notice .notice-frame,
-.notice-modal.is-capturing-notice .notice-paper,
-.is-capturing .notice-paper {
-  overflow: visible !important;
-  height: auto !important;
+.notice-modal.is-capturing-notice .notice-certificate.is-a4-capture,
+.notice-modal.is-capturing-notice .notice-certificate.is-a4-capture .notice-frame,
+.notice-modal.is-capturing-notice .notice-certificate.is-a4-capture .notice-paper,
+.is-capturing.is-a4-capture,
+.is-capturing.is-a4-capture .notice-frame,
+.is-capturing.is-a4-capture .notice-paper {
+  overflow: hidden !important;
 }
 
 .is-capturing .notice-body {
@@ -1987,7 +2001,7 @@ tbody tr:hover {
   left: -30%;
   top: -30%;
   pointer-events: none;
-  opacity: 0.14;
+  opacity: 0.06;
   transform: rotate(-28deg);
   transform-origin: center center;
   display: grid;
@@ -2008,7 +2022,7 @@ tbody tr:hover {
   justify-content: center;
   gap: 5px;
   white-space: nowrap;
-  color: #94949d;
+  color: #c4c4cc;
   font-family: Arial, Helvetica, sans-serif;
   font-size: 0.88rem;
   font-weight: 700;
@@ -2021,22 +2035,23 @@ tbody tr:hover {
   height: 26px;
   object-fit: contain;
   flex-shrink: 0;
-  opacity: 0.7;
-  filter: grayscale(1) brightness(1.05) contrast(0.95);
+  opacity: 0.35;
+  filter: grayscale(1) brightness(1.2) contrast(0.9);
 }
 
-/* Screenshot: watermark must stay clearly visible (html2canvas fades low opacity) */
+/* Screenshot: keep watermark very faint */
 .is-capturing .notice-watermark-layer {
-  opacity: 0.22;
+  opacity: 0.045;
 }
 
 .is-capturing .notice-watermark-item {
-  color: #7a7a84;
+  color: #b8b8c0;
+  opacity: 0.55;
 }
 
 .is-capturing .notice-watermark-item img {
-  opacity: 0.85;
-  filter: grayscale(1) brightness(0.95) contrast(1.05);
+  opacity: 0.35;
+  filter: grayscale(1) brightness(1.25) contrast(0.85);
 }
 
 .notice-inner {
