@@ -183,6 +183,40 @@ body {
   width: min(860px, 94vw);
 }
 
+.is-capture-hd .notice-certificate.is-a4-capture {
+  width: 794px;
+  max-width: none;
+  min-height: 1123px; /* A4 at ~96dpi */
+}
+
+.is-capture-hd .notice-certificate.is-a4-capture .notice-frame {
+  min-height: 1115px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.is-capture-hd .notice-certificate.is-a4-capture .notice-paper {
+  flex: 1 1 auto;
+  min-height: 1060px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.is-capture-hd .notice-certificate.is-a4-capture .notice-inner {
+  flex: 1 1 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.is-capture-hd .notice-certificate.is-a4-capture .notice-body {
+  flex: 1 1 auto;
+  min-height: 160px;
+}
+
 .is-capture-hd .notice-inner {
   padding: 40px 54px 30px;
 }

@@ -150,6 +150,7 @@ function getHintConfig(type) {
 function toggleModalScreenshotBar(show, type = null) {
   const bar = document.getElementById("modalScreenshotBar");
   const printBtn = document.getElementById("modalPrintBtn");
+  const shotBtn = document.getElementById("modalScreenshotBtn");
   if (!bar) return;
   bar.classList.toggle("hidden", !show);
   bar.setAttribute("aria-hidden", show ? "false" : "true");
@@ -158,6 +159,17 @@ function toggleModalScreenshotBar(show, type = null) {
     const showPrint = !!show;
     printBtn.classList.toggle("hidden", !showPrint);
     printBtn.setAttribute("aria-hidden", showPrint ? "false" : "true");
+  }
+  const isNotice = type === "notice";
+  const shotLabel = isNotice ? "Take A4 HD screenshot" : "Take Full HD screenshot";
+  const pdfLabel = isNotice ? "Download A4 HD PDF" : "Download Full HD PDF";
+  if (shotBtn) {
+    shotBtn.setAttribute("title", shotLabel);
+    shotBtn.setAttribute("aria-label", shotLabel);
+  }
+  if (printBtn) {
+    printBtn.setAttribute("title", pdfLabel);
+    printBtn.setAttribute("aria-label", pdfLabel);
   }
 }
 
@@ -172,11 +184,13 @@ function prepareCaptureSurface(dialog) {
       modal.scrollTop = 0;
     }
     window.scrollTo(0, 0);
+    applyNoticeA4Layout(dialog);
   }
 }
 
 function cleanupCaptureSurface(dialog) {
   dialog.classList.remove("is-capturing");
+  clearNoticeA4Layout(dialog);
   document.getElementById("noticeModal")?.classList.remove("is-capturing-notice");
 }
 
@@ -336,6 +350,11 @@ function applyHomeScene(scene) {
 }
 
 const FULL_HD = { width: 1920, height: 1080 };
+// A4 at 300 DPI — fixed export size for Notice (even when text is short)
+const A4_RATIO = 297 / 210;
+const A4_HD = { width: 2480, height: 3508 };
+const A4_CSS_WIDTH = 794; // ~210mm at 96dpi
+const NOTICE_CAPTURE_BG = "#855486";
 
 function getFullHdCaptureScale() {
   const widthScale = FULL_HD.width / Math.max(window.innerWidth, 1);
@@ -364,6 +383,93 @@ function ensureFullHdCanvas(sourceCanvas) {
   const dy = Math.round((out.height - drawH) / 2);
   ctx.drawImage(sourceCanvas, dx, dy, drawW, drawH);
   return out;
+}
+
+/** Always output exact A4 HD pixels; pad short content, fit long content. */
+function ensureA4HdCanvas(sourceCanvas, backgroundColor = NOTICE_CAPTURE_BG) {
+  const out = document.createElement("canvas");
+  out.width = A4_HD.width;
+  out.height = A4_HD.height;
+  const ctx = out.getContext("2d");
+  if (!ctx) return sourceCanvas;
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.fillStyle = backgroundColor;
+  ctx.fillRect(0, 0, out.width, out.height);
+
+  const scale = Math.min(out.width / sourceCanvas.width, out.height / sourceCanvas.height);
+  const drawW = Math.round(sourceCanvas.width * scale);
+  const drawH = Math.round(sourceCanvas.height * scale);
+  const dx = Math.round((out.width - drawW) / 2);
+  const dy = Math.round((out.height - drawH) / 2);
+  ctx.drawImage(sourceCanvas, dx, dy, drawW, drawH);
+  return out;
+}
+
+function applyNoticeA4Layout(dialog) {
+  if (!dialog || dialog.id !== "noticeDialog") return;
+  const a4Height = Math.round(A4_CSS_WIDTH * A4_RATIO);
+
+  dialog.classList.add("is-a4-capture");
+  dialog.style.width = `${A4_CSS_WIDTH}px`;
+  dialog.style.maxWidth = "none";
+  dialog.style.minHeight = `${a4Height}px`;
+  dialog.style.height = "auto";
+  dialog.style.boxSizing = "border-box";
+
+  const frame = dialog.querySelector(".notice-frame");
+  const paper = dialog.querySelector(".notice-paper");
+  const inner = dialog.querySelector(".notice-inner");
+  const body = dialog.querySelector(".notice-body");
+
+  if (frame) {
+    frame.style.minHeight = `${a4Height - 8}px`;
+    frame.style.height = "auto";
+    frame.style.boxSizing = "border-box";
+    frame.style.display = "flex";
+    frame.style.flexDirection = "column";
+  }
+  if (paper) {
+    paper.style.flex = "1 1 auto";
+    paper.style.minHeight = `${Math.max(a4Height - 56, 900)}px`;
+    paper.style.height = "auto";
+    paper.style.display = "flex";
+    paper.style.flexDirection = "column";
+    paper.style.boxSizing = "border-box";
+  }
+  if (inner) {
+    inner.style.flex = "1 1 auto";
+    inner.style.minHeight = "100%";
+    inner.style.display = "flex";
+    inner.style.flexDirection = "column";
+    inner.style.boxSizing = "border-box";
+  }
+  if (body) {
+    body.style.flex = "1 1 auto";
+    body.style.minHeight = "160px";
+  }
+}
+
+function clearNoticeA4Layout(dialog) {
+  if (!dialog || dialog.id !== "noticeDialog") return;
+  dialog.classList.remove("is-a4-capture");
+  dialog.style.width = "";
+  dialog.style.maxWidth = "";
+  dialog.style.minHeight = "";
+  dialog.style.height = "";
+  dialog.style.boxSizing = "";
+
+  [".notice-frame", ".notice-paper", ".notice-inner", ".notice-body"].forEach((sel) => {
+    const el = dialog.querySelector(sel);
+    if (!el) return;
+    el.style.minHeight = "";
+    el.style.height = "";
+    el.style.flex = "";
+    el.style.display = "";
+    el.style.flexDirection = "";
+    el.style.boxSizing = "";
+  });
 }
 
 function downloadPngCanvas(canvas, filename) {
@@ -417,7 +523,7 @@ async function captureDashboardScreenshot(triggerEl = null) {
   try {
     trigger.classList.add("is-busy");
     trigger.setAttribute("aria-busy", "true");
-    trigger.setAttribute("title", "Capturing Full HD...");
+    trigger.setAttribute("title", isNotice ? "Capturing A4 HD..." : "Capturing Full HD...");
 
     // Capture only the open modal/certificate — not the dashboard behind it
     prepareCaptureSurface(dialog);
@@ -427,32 +533,45 @@ async function captureDashboardScreenshot(triggerEl = null) {
       if (modal) modal.scrollTop = 0;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 180));
+    await new Promise((resolve) => setTimeout(resolve, 220));
 
     const rawCanvas = await captureModalDialogCanvas(dialog, {
-      backgroundColor: isNotice ? "#855486" : config.captureBg || "#16082a",
+      backgroundColor: isNotice ? NOTICE_CAPTURE_BG : config.captureBg || "#16082a",
       scale: 3,
+      forceA4: isNotice,
     });
 
-    // Boost to at least Full HD width for crisp desktop screenshots
-    let hdCanvas = rawCanvas;
-    if (rawCanvas.width < FULL_HD.width) {
-      const boosted = document.createElement("canvas");
-      const ratio = FULL_HD.width / rawCanvas.width;
-      boosted.width = FULL_HD.width;
-      boosted.height = Math.round(rawCanvas.height * ratio);
-      const ctx = boosted.getContext("2d");
-      if (ctx) {
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(rawCanvas, 0, 0, boosted.width, boosted.height);
-        hdCanvas = boosted;
+    let hdCanvas;
+    if (isNotice) {
+      // Always exact A4 HD (2480×3508), even when edited text is short
+      hdCanvas = ensureA4HdCanvas(rawCanvas, NOTICE_CAPTURE_BG);
+    } else {
+      // Boost to at least Full HD width for crisp desktop screenshots
+      hdCanvas = rawCanvas;
+      if (rawCanvas.width < FULL_HD.width) {
+        const boosted = document.createElement("canvas");
+        const ratio = FULL_HD.width / rawCanvas.width;
+        boosted.width = FULL_HD.width;
+        boosted.height = Math.round(rawCanvas.height * ratio);
+        const ctx = boosted.getContext("2d");
+        if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(rawCanvas, 0, 0, boosted.width, boosted.height);
+          hdCanvas = boosted;
+        }
       }
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    await downloadPngCanvas(hdCanvas, `${config.filePrefix}-fullhd-${timestamp}.png`);
-    showToast(`${config.toastLabel} Full HD screenshot downloaded.`, "success");
+    const fileSuffix = isNotice ? "a4-hd" : "fullhd";
+    await downloadPngCanvas(hdCanvas, `${config.filePrefix}-${fileSuffix}-${timestamp}.png`);
+    showToast(
+      isNotice
+        ? `${config.toastLabel} A4 HD screenshot downloaded.`
+        : `${config.toastLabel} Full HD screenshot downloaded.`,
+      "success"
+    );
   } catch (error) {
     console.error(error);
     showToast("Unable to capture screenshot.", "error");
@@ -502,8 +621,17 @@ function applyNoticeCaptureFixes(clonedDoc) {
 async function captureModalDialogCanvas(dialog, options = {}) {
   const scale = options.scale || Math.min(Math.max(getFullHdCaptureScale(), 2.5), 3);
   const backgroundColor = options.backgroundColor || null;
-  const width = Math.max(dialog.scrollWidth, dialog.offsetWidth, 1);
-  const height = Math.max(dialog.scrollHeight, dialog.offsetHeight, 1);
+  const forceA4 = !!options.forceA4 && dialog.id === "noticeDialog";
+  const a4CssHeight = Math.round(A4_CSS_WIDTH * A4_RATIO);
+
+  let width = Math.max(dialog.scrollWidth, dialog.offsetWidth, 1);
+  let height = Math.max(dialog.scrollHeight, dialog.offsetHeight, 1);
+
+  if (forceA4) {
+    width = A4_CSS_WIDTH;
+    // Keep at least full A4 height so short edited text still fills the page
+    height = Math.max(height, a4CssHeight, dialog.scrollHeight, 1);
+  }
 
   return window.html2canvas(dialog, {
     backgroundColor,
@@ -535,6 +663,38 @@ async function captureModalDialogCanvas(dialog, options = {}) {
         clonedDialog.style.transform = "none";
         clonedDialog.style.overflow = "visible";
         clonedDialog.style.height = "auto";
+        if (forceA4) {
+          clonedDialog.classList.add("is-a4-capture");
+          clonedDialog.style.minHeight = `${a4CssHeight}px`;
+          const frame = clonedDialog.querySelector(".notice-frame");
+          const paper = clonedDialog.querySelector(".notice-paper");
+          const inner = clonedDialog.querySelector(".notice-inner");
+          const body = clonedDialog.querySelector(".notice-body");
+          if (frame) {
+            frame.style.minHeight = `${a4CssHeight - 8}px`;
+            frame.style.display = "flex";
+            frame.style.flexDirection = "column";
+            frame.style.boxSizing = "border-box";
+          }
+          if (paper) {
+            paper.style.flex = "1 1 auto";
+            paper.style.minHeight = `${Math.max(a4CssHeight - 56, 900)}px`;
+            paper.style.display = "flex";
+            paper.style.flexDirection = "column";
+            paper.style.boxSizing = "border-box";
+            paper.style.overflow = "visible";
+          }
+          if (inner) {
+            inner.style.flex = "1 1 auto";
+            inner.style.minHeight = "100%";
+            inner.style.display = "flex";
+            inner.style.flexDirection = "column";
+          }
+          if (body) {
+            body.style.flex = "1 1 auto";
+            body.style.minHeight = "160px";
+          }
+        }
       }
       const clonedModal = clonedDoc.getElementById("noticeModal");
       if (clonedModal) {
@@ -576,25 +736,43 @@ function downloadBlobFile(blob, filename) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-async function buildHdPdfFromCanvas(canvas, filename) {
+async function buildHdPdfFromCanvas(canvas, filename, options = {}) {
   const JsPDF = getJsPdfConstructor();
   if (typeof JsPDF !== "function") {
     throw new Error("PDF library failed to load");
   }
 
-  // A4-width HD page; height grows with content so nothing is cropped
+  const forceA4 = !!options.forceA4;
+  // Notice: always exact A4. Other modals: A4 width, grow height if needed.
   const pdfWidthMm = 210;
-  const pdfHeightMm = Math.max(297, (canvas.height / Math.max(canvas.width, 1)) * pdfWidthMm);
+  const pdfHeightMm = forceA4
+    ? 297
+    : Math.max(297, (canvas.height / Math.max(canvas.width, 1)) * pdfWidthMm);
   const pdf = new JsPDF({
     orientation: pdfHeightMm >= pdfWidthMm ? "portrait" : "landscape",
     unit: "mm",
-    format: [pdfWidthMm, pdfHeightMm],
+    format: forceA4 ? "a4" : [pdfWidthMm, pdfHeightMm],
     compress: true,
   });
 
   const imgData = canvasToJpegDataUrl(canvas, 0.96);
   const format = imgData.startsWith("data:image/png") ? "PNG" : "JPEG";
-  pdf.addImage(imgData, format, 0, 0, pdfWidthMm, pdfHeightMm, undefined, "FAST");
+
+  if (forceA4) {
+    // Fit image inside fixed A4 (pad if short content already padded on canvas)
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const scale = Math.min(pageW / canvas.width, pageH / canvas.height);
+    const drawW = canvas.width * scale;
+    const drawH = canvas.height * scale;
+    const x = (pageW - drawW) / 2;
+    const y = (pageH - drawH) / 2;
+    pdf.setFillColor(133, 84, 134);
+    pdf.rect(0, 0, pageW, pageH, "F");
+    pdf.addImage(imgData, format, x, y, drawW, drawH, undefined, "FAST");
+  } else {
+    pdf.addImage(imgData, format, 0, 0, pdfWidthMm, pdfHeightMm, undefined, "FAST");
+  }
 
   // Blob download works reliably on laptop/desktop Chrome, Edge, Firefox
   const blob = pdf.output("blob");
@@ -627,7 +805,7 @@ async function downloadModalHdPdf(triggerEl = null) {
   try {
     trigger?.classList.add("is-busy");
     trigger?.setAttribute("aria-busy", "true");
-    trigger?.setAttribute("title", "Building Full HD PDF...");
+    trigger?.setAttribute("title", isNotice ? "Building A4 HD PDF..." : "Building Full HD PDF...");
 
     prepareCaptureSurface(dialog);
     document.body.classList.add("is-capture-hd");
@@ -635,32 +813,45 @@ async function downloadModalHdPdf(triggerEl = null) {
       const modal = document.getElementById("noticeModal");
       if (modal) modal.scrollTop = 0;
     }
-    await new Promise((resolve) => setTimeout(resolve, 180));
+    await new Promise((resolve) => setTimeout(resolve, 220));
 
     const canvas = await captureModalDialogCanvas(dialog, {
-      backgroundColor: isNotice ? "#855486" : config.captureBg || "#16082a",
+      backgroundColor: isNotice ? NOTICE_CAPTURE_BG : config.captureBg || "#16082a",
       scale: 3,
+      forceA4: isNotice,
     });
 
-    // Ensure at least Full HD width pixels for crisp PDF on desktop screens
-    let exportCanvas = canvas;
-    if (canvas.width < FULL_HD.width) {
-      const boosted = document.createElement("canvas");
-      const ratio = FULL_HD.width / canvas.width;
-      boosted.width = FULL_HD.width;
-      boosted.height = Math.round(canvas.height * ratio);
-      const ctx = boosted.getContext("2d");
-      if (ctx) {
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(canvas, 0, 0, boosted.width, boosted.height);
-        exportCanvas = boosted;
+    let exportCanvas;
+    if (isNotice) {
+      exportCanvas = ensureA4HdCanvas(canvas, NOTICE_CAPTURE_BG);
+    } else {
+      exportCanvas = canvas;
+      if (canvas.width < FULL_HD.width) {
+        const boosted = document.createElement("canvas");
+        const ratio = FULL_HD.width / canvas.width;
+        boosted.width = FULL_HD.width;
+        boosted.height = Math.round(canvas.height * ratio);
+        const ctx = boosted.getContext("2d");
+        if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(canvas, 0, 0, boosted.width, boosted.height);
+          exportCanvas = boosted;
+        }
       }
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    await buildHdPdfFromCanvas(exportCanvas, `${config.filePrefix}-fullhd-${timestamp}.pdf`);
-    showToast(`${config.toastLabel} Full HD PDF downloaded.`, "success");
+    const fileSuffix = isNotice ? "a4-hd" : "fullhd";
+    await buildHdPdfFromCanvas(exportCanvas, `${config.filePrefix}-${fileSuffix}-${timestamp}.pdf`, {
+      forceA4: isNotice,
+    });
+    showToast(
+      isNotice
+        ? `${config.toastLabel} A4 HD PDF downloaded.`
+        : `${config.toastLabel} Full HD PDF downloaded.`,
+      "success"
+    );
   } catch (error) {
     console.error(error);
     showToast("Unable to download Full HD PDF.", "error");
